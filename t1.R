@@ -67,6 +67,55 @@ matriz_transicion = function(dataset){
   return (frecuencias_totales)
 }
 
+formato_matriz = function(matriz, dim){
+  P = matrix(nrow=dim, ncol=dim)
+  contador = 0
+  temp = c()
+  for(i in 1:dim^2){
+    temp = append(temp, matriz[i])
+    contador = contador + 1
+    if (contador == 3){
+      P[i/3, ] = temp
+      temp = c()
+      contador = 0
+    }
+  }
+  colnames(P) <- c(1:dim)
+  rownames(P) <- c(1:dim)
+  return(P)
+}
+
+set.seed(123456)
+
 matriz_transicion_entrenamiento = matriz_transicion(ganancias_clasificadas_entrenamiento)
 matriz_transicion_prueba = matriz_transicion(ganancias_clasificadas_prueba)
+P_entrenamiento = formato_matriz(matriz_transicion_entrenamiento, 3)
+P_prueba = formato_matriz(matriz_transicion_prueba, 3)
+
+# Parte (c)
+
+pi.0 = c(0, 1, 0)
+D <- diag(eigen(P_entrenamiento)$value)
+A <- eigen(P_entrenamiento)$vect
+
+Pn <- c()
+for(k in 1:nrow(prueba)){
+  pi.k <- pi.0%*%A%*%D^k%*%solve(A)
+  Pn <- rbind(Pn, pi.k)
+}
+rownames(Pn) <- 1:nrow(prueba)
+colnames(Pn) <- 1:3
+Pn
+
+# simulacion
+vector_promedios = c()
+for(i in 1:1000){
+  y <- c()
+  for(n in 1:nrow(prueba)){
+    y[n] <- sample(1:3, prob= Pn[n,], size = 1)
+  }
+  promedio = sum(ganancias_clasificadas_prueba == y) / length(ganancias_clasificadas_prueba)
+  vector_promedios = append(vector_promedios, promedio)
+}
+
 
