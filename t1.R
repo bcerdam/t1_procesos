@@ -8,15 +8,10 @@ head(aapl_data)
 
 # Parte 2. dice "precio de cierre ajustado". Esta variable no existe, solamente existe de cierre o ajustado.
 # Voy a ocupar el valor ajustado.
-aapl_adjusted = aapl_data$AAPL.Adjusted
-ganancias = c()
 
-for(i in 1:nrow(aapl_adjusted)){
-  ganancias[i] = as.numeric(aapl_adjusted[i+1]) - as.numeric(aapl_adjusted[i])
-  if(i+1 == length(aapl_adjusted)){
-    break
-  }
-}
+aapl_adjusted = aapl_data$AAPL.Adjusted
+ganancias = dailyReturn(aapl_adjusted)
+aapl_data$ganancias = ganancias
 
 # Parte 3. 
 
@@ -26,17 +21,52 @@ prueba = aapl_data["2024-09-01/2024-09-27"]
 
 # Parte (a)
 
-ganancias_clasificadas = c()
-for(i in 1:length(ganancias)){
-  if(ganancias[i] > -Inf & ganancias[i] <= -0.01){
-    ganancias_clasificadas[i] = 1
+clasificar = function(dataset){
+  ganancias_clasificadas = c()
+  for(i in 1:nrow(dataset)){
+    if(as.numeric(dataset$ganancias[i]) > -Inf & as.numeric(dataset$ganancias[i]) <= -0.01){
+      ganancias_clasificadas[i] = 1
+    }
+    else if(as.numeric(dataset$ganancias[i]) > -0.01 & as.numeric(dataset$ganancias[i]) <= 0.01){
+      ganancias_clasificadas[i] = 2
+    }
+    else if(as.numeric(dataset$ganancias[i]) > 0.01 & as.numeric(dataset$ganancias[i]) <= Inf){
+      ganancias_clasificadas[i] = 3
+    }
   }
-  else if(ganancias[i] > -0.01 & ganancias[i] <= 0.01){
-    ganancias_clasificadas[i] = 2
-  }
-  else if(ganancias[i] > 0.01 & ganancias[i] <= Inf){
-    ganancias_clasificadas[i] = 3
-  }
+  return(ganancias_clasificadas)
 }
 
-# Hay muy pocos que estan en estado '2', medio sospechoso.
+ganancias_clasificadas_entrenamiento = clasificar(entrenamiento)
+ganancias_clasificadas_prueba = clasificar(prueba)
+
+# Parte (b)
+
+matriz_transicion = function(dataset){
+  frecuencias_totales = c()
+  for(i in 1:3){
+    frecuencias = c()
+    conteo_fila = 0
+    for(j in 1:3){
+      conteo_punto = 0
+      for(k in 1:length(dataset)){
+        if(k+1 == length(dataset)){
+          break
+        }
+        par_n0 = dataset[k]
+        par_n1 = dataset[k+1]
+        if(i == par_n0 & j == par_n1){
+          conteo_punto = conteo_punto + 1
+        }
+      }
+      conteo_fila = conteo_fila + conteo_punto
+      frecuencias = append(frecuencias, conteo_punto)
+    }
+    frecuencias_totales = append(frecuencias_totales, frecuencias*1/conteo_fila)
+  }
+  return (frecuencias_totales)
+}
+
+matriz_transicion_entrenamiento = matriz_transicion(ganancias_clasificadas_entrenamiento)
+matriz_transicion_prueba = matriz_transicion(ganancias_clasificadas_prueba)
+
