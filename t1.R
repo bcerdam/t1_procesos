@@ -85,7 +85,8 @@ formato_matriz = function(matriz, dim){
   return(P)
 }
 
-set.seed(123456)
+#set.seed(123456)
+set.seed(2017)
 
 matriz_transicion_entrenamiento = matriz_transicion(ganancias_clasificadas_entrenamiento)
 matriz_transicion_prueba = matriz_transicion(ganancias_clasificadas_prueba)
@@ -118,4 +119,37 @@ for(i in 1:1000){
   vector_promedios = append(vector_promedios, promedio)
 }
 
+hist(vector_promedios)
 
+# parte (d)
+
+# comportamiento leptocurtico => verificar si kurtosis es positiva
+# Tambien visualmente podemos ver si tiene colas pesadas y una concentracion central mas grande.
+
+# install.packages('moments')
+library(moments)
+ganancias_kurtosis = kurtosis(aapl_data$ganancias) # Positiva y no se aproxima a 0 -> comportamiento leptocurtico.
+
+hist(aapl_data$ganancias) # Concentracion central si, "pico alto" si, colas pesadas si.
+
+# Yo diria que si tiene comportamiento leptocurtico.
+
+# No se a que se refiere con: 'baja o nula auto-correlación serial y auto-correlación serial significativa en sus cuadrados.'
+
+
+# parte (3)
+
+# install.packages("fitdistrplus")
+library(fitdistrplus)
+
+fit = fitdistr(as.numeric(aapl_data$ganancias), "t")
+
+m = as.numeric(fit$estimate)[1]
+s = as.numeric(fit$estimate)[2]
+df = as.numeric(fit$estimate)[3]
+
+hist(aapl_data$ganancias)
+#(dt((x - m) / s, df)/s, add = TRUE) # No estoy seguro porque funciona si dividimos 2 veces por s
+curve(dt((x - m)/s, df)/s, add=TRUE)
+
+valores_simulados = ((rt(10^3, df) - m)/s)/s
