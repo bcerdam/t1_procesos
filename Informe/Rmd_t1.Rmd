@@ -87,13 +87,13 @@ matriz_transicion = function(dataset){
     for(j in 1:3){
       conteo_punto = 0
       for(k in 1:length(dataset)){
-        if(k+1 == length(dataset)){
-          break
-        }
         par_n0 = dataset[k]
         par_n1 = dataset[k+1]
         if(i == par_n0 & j == par_n1){
           conteo_punto = conteo_punto + 1
+        }
+        if(k+1 == length(dataset)){
+          break
         }
       }
       conteo_fila = conteo_fila + conteo_punto
@@ -135,9 +135,9 @@ print(P_entrenamiento)
 ```
 
 ## Interpretación
-- La probabilidad de que un día con un retorno negativo significativo sea seguido por otro día con retorno negativo significativo es del 29.09%.
-- Un día con una variación leve en el retorno tiene una probabilidad del 54.22% de ser seguido por otro día similar, y una probabilidad del 27.23% de cambiar a un retorno positivo significativo.
-- Los días con retornos positivos significativos tienen una alta probabilidad (55.67%) de continuar en una tendencia positiva.
+- La probabilidad de que un día con un retorno negativo significativo (**estado 1**)  sea seguido por otro día con retorno negativo significativo es del 29.09%.
+- Un día con una variación leve (**estado 2**) en el retorno tiene una probabilidad del 54.21% de ser seguido por otro día similar, y una probabilidad del 27.22% de cambiar a un retorno positivo significativo.
+- Los días con retornos positivos significativos (**estado 3**) tienen una alta probabilidad 23.58% de continuar en una tendencia positiva.
 
 Este análisis nos da una idea clara de cómo los rendimientos diarios de Apple tienden a agruparse o cambiar entre estos estados.
 
@@ -168,6 +168,11 @@ for(i in 1:1000){
   promedio = sum(ganancias_clasificadas_prueba == y) / length(ganancias_clasificadas_prueba)
   vector_promedios = append(vector_promedios, promedio)
 }
+
+```
+
+```{r, echo=FALSE}
+
 # Mostrar histograma de los promedios de acierto
 hist(vector_promedios, main = "Histograma de Promedios de Acierto", 
      xlab = "Promedio de Acierto", col = "skyblue", border = "white")
@@ -175,6 +180,7 @@ hist(vector_promedios, main = "Histograma de Promedios de Acierto",
 # Calcular y mostrar el promedio total de aciertos
 mean_aciertos <- mean(vector_promedios)
 cat("El promedio de acierto después de 1000 simulaciones es:", mean_aciertos)
+
 ```
 
 # Verificación de las características estilizadas:
@@ -191,18 +197,26 @@ par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), cex.lab=0.8, cex.axis=0.8)
 
 # 1. Leptocurtosis: Verificar si la kurtosis es positiva
 kurtosis_ganancias <- kurtosis(aapl_data$ganancias)
-cat("Kurtosis de las rentabilidades diarias:", kurtosis_ganancias, "\n")
 
+library(fitdistrplus)
 
+# Ajuste
+fit = fitdistr(as.numeric(aapl_data$ganancias), "t")
+
+m = as.numeric(fit$estimate)[1]
+s = as.numeric(fit$estimate)[2]
+df = as.numeric(fit$estimate)[3]
 hist(aapl_data$ganancias, probability=TRUE,
      xlab="Rentabilidad", col="lightblue", border="white")
+
+curve(dt((x - m)/s, df)/s, add=TRUE, from=min(aapl_data$ganancias), to=max(aapl_data$ganancias))
 
 acf(aapl_data$ganancias,main="ACF", lag.max=30)
 acf(aapl_data$ganancias^2, main="ACF R^2", lag.max=30)
 par(mfrow = c(1, 1))
 
 ``` 
-(1) hist aapl_data$ganancias, (2) ACF (3) ACF^2
+(1) hist aapl_data$ganancias (con una curva ajustada t-student), (2) ACF (3) ACF^2
 
 ### Conclusiones
 
@@ -245,53 +259,33 @@ cat("Escala:", fit_t$estimate[2], "\n")
 cat("Grados de libertad:", fit_t$estimate[3], "\n")
 ```
 
-### Simulación de Rentabilidades usando la Distribución Ajustada
-
-```{r message=FALSE, warning=FALSE, echo=FALSE}
-# Número de simulaciones
-n_simulaciones <- nrow(aapl_data)
-
-# Generar simulaciones usando la distribución t ajustada
-simulaciones <- rt(n_simulaciones, df = fit_t$estimate[3]) * fit_t$estimate[2] + fit_t$estimate[1]
-
-# Visualizar la distribución simulada
-hist(simulaciones, probability=TRUE, main="Distribución Simulada de las Rentabilidades",
-     xlab="Rentabilidad Simulada", col="lightblue", border="white")
-```
 
 ###  Comparación entre la matriz de transición simulada y la versión empírica obtenida en (b).
 
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
-# Clasificar las simulaciones en los mismos tres estados usados anteriormente
-clasificar_simulaciones <- function(dataset){
-  estados_simulados <- cut(dataset, breaks = c(-Inf, -0.01, 0.01, Inf),
-                           labels = c("(-Inf, -0.01]", "(-0.01, 0.01]", "(0.01, Inf]"))
-  return(estados_simulados)
-}
+# Simulacion
+samples = m + s * rt(nrow(aapl_data$ganancias), df)
 
-# Clasificar las rentabilidades simuladas
-estados_simulados <- clasificar_simulaciones(simulaciones)
+library(xts)
+fechas = seq(as.Date("2022-08-01"), by = "day", length.out = nrow(aapl_data$ganancias))
+valores_simulados = xts(samples, fechas)
+colnames(valores_simulados) <- 'ganancias'
 
-# Calcular la matriz de transición a partir de las simulaciones
-tabla_simulada <- table(estados_simulados[-length(estados_simulados)], estados_simulados[-1])
+P_ajustada = formato_matriz(matriz_transicion(clasificar(valores_simulados)), 3)
 
-# Normalizar la tabla para obtener la matriz de transición
-matriz_transicion_simulada <- prop.table(tabla_simulada, 1)
-
-### Comparación de las Matrices de Transición
 
 # Comparar la matriz de transición simulada con la empírica
 cat("Matriz de Transición Empírica:\n")
 print(P_entrenamiento)
 
 cat("\nMatriz de Transición Simulada:\n")
-print(matriz_transicion_simulada)
+print(P_ajustada)
 
 # Visualización de ambas matrices para comparación
 # Convertir las matrices a dataframes para facilitar la comparación
 df_empirica <- as.data.frame(P_entrenamiento)
-df_simulada <- as.data.frame(matriz_transicion_simulada)
+df_simulada <- as.data.frame(P_ajustada)
 
 
 ```
