@@ -137,19 +137,35 @@ hist(aapl_data$ganancias) # Concentracion central si, "pico alto" si, colas pesa
 # No se a que se refiere con: 'baja o nula auto-correlación serial y auto-correlación serial significativa en sus cuadrados.'
 
 
-# parte (3)
+# parte (e)
 
 # install.packages("fitdistrplus")
 library(fitdistrplus)
 
+# Ajuste
 fit = fitdistr(as.numeric(aapl_data$ganancias), "t")
 
+# Parametros Ajuste
 m = as.numeric(fit$estimate)[1]
 s = as.numeric(fit$estimate)[2]
 df = as.numeric(fit$estimate)[3]
 
-hist(aapl_data$ganancias)
-#(dt((x - m) / s, df)/s, add = TRUE) # No estoy seguro porque funciona si dividimos 2 veces por s
-curve(dt((x - m)/s, df)/s, add=TRUE)
+# Plotteo del resultado del ajuste
+hist(aapl_data$ganancias, probability=TRUE)
+curve(dt((x - m)/s, df)/s, add=TRUE, from=min(aapl_data$ganancias), to=max(aapl_data$ganancias))
 
-valores_simulados = ((rt(10^3, df) - m)/s)/s
+# Simulacion
+samples = m + s * rt(nrow(aapl_data$ganancias), df)
+
+library(xts)
+fechas = seq(as.Date("2022-08-01"), by = "day", length.out = nrow(aapl_data$ganancias))
+valores_simulados = xts(samples, fechas)
+colnames(valores_simulados) <- 'ganancias'
+
+P_ajustada = formato_matriz(matriz_transicion(clasificar(valores_simulados)), 3)
+
+# Comparacion matriz transicion ajustada y entrenamiento.
+P_entrenamiento
+P_ajustada
+
+
