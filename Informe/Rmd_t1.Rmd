@@ -1,0 +1,298 @@
+---
+title: "Informe"
+author: "Benjamin Prieto, Bruno Cerda, Santiago Valenzuela"
+date: "2024-10-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+# Matriz de Transición Empírica
+
+## Cálculo de la Matriz de Transición
+Para construir la matriz de transición, se siguió el siguiente procedimiento:
+
+1. **Cálculo de los Retornos Diarios:** 
+   Los retornos diarios (\(r_t\)) fueron calculados como:
+   \[
+   r_t = \frac{P_t - P_{t-1}}{P_{t-1}}
+   \]
+   donde \(P_t\) es el precio de cierre ajustado en el día \(t\).
+
+2. **Clasificación en Estados:** 
+   Posteriormente, se clasificaron los retornos diarios en los tres estados definidos.
+
+3. **Cálculo de las Transiciones:** 
+   Se contó el número de veces que ocurrió una transición de un estado \(i\) a otro estado \(j\) entre días consecutivos. Las frecuencias de estas transiciones fueron normalizadas para obtener las probabilidades de transición de un estado a otro.
+
+4. **Construcción de la Matriz:** 
+   La matriz de transición \(T\) es una matriz de 3x3 donde la entrada \(T_{ij}\) indica la probabilidad de moverse del estado \(i\) al estado \(j\) en un solo paso. Estas probabilidades se calculan dividiendo el número de transiciones del estado \(i\) al estado \(j\) entre el número total de ocurrencias del estado \(i\).
+   
+La siguiente es la matriz de transición empírica calculada obtenida a partir del conjunto de entrenamiento:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+# Parte 1.
+
+library(quantmod)
+# Descargar datos de Apple (AAPL) desde Yahoo Finance
+getSymbols("AAPL", src = "yahoo", from = "2021-08-01", to = "2024-09-30")
+aapl_data <- AAPL
+
+# Parte 2. dice "precio de cierre ajustado". Esta variable no existe, solamente existe de cierre o ajustado.
+# Voy a ocupar el valor ajustado.
+
+aapl_adjusted = aapl_data$AAPL.Adjusted
+ganancias = dailyReturn(aapl_adjusted)
+aapl_data$ganancias = ganancias
+
+# Parte 3. 
+
+entrenamiento = aapl_data["2021-08-02/2024-08-31"]
+prueba = aapl_data["2024-09-01/2024-09-27"]
+
+
+# Parte (a)
+
+clasificar = function(dataset){
+  ganancias_clasificadas = c()
+  for(i in 1:nrow(dataset)){
+    if(as.numeric(dataset$ganancias[i]) > -Inf & as.numeric(dataset$ganancias[i]) <= -0.01){
+      ganancias_clasificadas[i] = 1
+    }
+    else if(as.numeric(dataset$ganancias[i]) > -0.01 & as.numeric(dataset$ganancias[i]) <= 0.01){
+      ganancias_clasificadas[i] = 2
+    }
+    else if(as.numeric(dataset$ganancias[i]) > 0.01 & as.numeric(dataset$ganancias[i]) <= Inf){
+      ganancias_clasificadas[i] = 3
+    }
+  }
+  return(ganancias_clasificadas)
+}
+
+ganancias_clasificadas_entrenamiento = clasificar(entrenamiento)
+ganancias_clasificadas_prueba = clasificar(prueba)
+
+# Parte (b)
+
+matriz_transicion = function(dataset){
+  frecuencias_totales = c()
+  for(i in 1:3){
+    frecuencias = c()
+    conteo_fila = 0
+    for(j in 1:3){
+      conteo_punto = 0
+      for(k in 1:length(dataset)){
+        if(k+1 == length(dataset)){
+          break
+        }
+        par_n0 = dataset[k]
+        par_n1 = dataset[k+1]
+        if(i == par_n0 & j == par_n1){
+          conteo_punto = conteo_punto + 1
+        }
+      }
+      conteo_fila = conteo_fila + conteo_punto
+      frecuencias = append(frecuencias, conteo_punto)
+    }
+    frecuencias_totales = append(frecuencias_totales, frecuencias*1/conteo_fila)
+  }
+  return (frecuencias_totales)
+}
+
+formato_matriz = function(matriz, dim){
+  P = matrix(nrow=dim, ncol=dim)
+  contador = 0
+  temp = c()
+  for(i in 1:dim^2){
+    temp = append(temp, matriz[i])
+    contador = contador + 1
+    if (contador == 3){
+      P[i/3, ] = temp
+      temp = c()
+      contador = 0
+    }
+  }
+  colnames(P) <- c(1:dim)
+  rownames(P) <- c(1:dim)
+  return(P)
+}
+
+#set.seed(123456)
+set.seed(2017)
+
+matriz_transicion_entrenamiento = matriz_transicion(ganancias_clasificadas_entrenamiento)
+matriz_transicion_prueba = matriz_transicion(ganancias_clasificadas_prueba)
+P_entrenamiento = formato_matriz(matriz_transicion_entrenamiento, 3)
+P_prueba = formato_matriz(matriz_transicion_prueba, 3)
+
+
+print(P_entrenamiento)
+```
+
+## Interpretación
+- La probabilidad de que un día con un retorno negativo significativo sea seguido por otro día con retorno negativo significativo es del 29.09%.
+- Un día con una variación leve en el retorno tiene una probabilidad del 54.22% de ser seguido por otro día similar, y una probabilidad del 27.23% de cambiar a un retorno positivo significativo.
+- Los días con retornos positivos significativos tienen una alta probabilidad (55.67%) de continuar en una tendencia positiva.
+
+Este análisis nos da una idea clara de cómo los rendimientos diarios de Apple tienden a agruparse o cambiar entre estos estados.
+
+# Resultados de la simulación de las cadenas de Markov a partir del último estado del que se tiene registro:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+set.seed(123456)
+pi.0 = c(0, 1, 0)
+D <- diag(eigen(P_entrenamiento)$value)
+A <- eigen(P_entrenamiento)$vect
+
+Pn <- c()
+for(k in 1:nrow(prueba)){
+  pi.k <- pi.0%*%A%*%D^k%*%solve(A)
+  Pn <- rbind(Pn, pi.k)
+}
+rownames(Pn) <- 1:nrow(prueba)
+colnames(Pn) <- 1:3
+Pn
+
+# simulacion
+vector_promedios = c()
+for(i in 1:1000){
+  y <- c()
+  for(n in 1:nrow(prueba)){
+    y[n] <- sample(1:3, prob= Pn[n,], size = 1)
+  }
+  promedio = sum(ganancias_clasificadas_prueba == y) / length(ganancias_clasificadas_prueba)
+  vector_promedios = append(vector_promedios, promedio)
+}
+# Mostrar histograma de los promedios de acierto
+hist(vector_promedios, main = "Histograma de Promedios de Acierto", 
+     xlab = "Promedio de Acierto", col = "skyblue", border = "white")
+
+# Calcular y mostrar el promedio total de aciertos
+mean_aciertos <- mean(vector_promedios)
+cat("El promedio de acierto después de 1000 simulaciones es:", mean_aciertos)
+```
+
+# Verificación de las características estilizadas:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, fig.width=5, fig.height=2.5, out.width='50%', out.height='50%'}
+# Parte (d): Verificación de las características estilizadas
+
+# Instalar si es necesario el paquete moments
+# install.packages('moments')
+
+library(moments)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), cex.lab=0.8, cex.axis=0.8)
+
+# 1. Leptocurtosis: Verificar si la kurtosis es positiva
+kurtosis_ganancias <- kurtosis(aapl_data$ganancias)
+cat("Kurtosis de las rentabilidades diarias:", kurtosis_ganancias, "\n")
+
+
+hist(aapl_data$ganancias, probability=TRUE,
+     xlab="Rentabilidad", col="lightblue", border="white")
+
+acf(aapl_data$ganancias,main="ACF", lag.max=30)
+acf(aapl_data$ganancias^2, main="ACF R^2", lag.max=30)
+par(mfrow = c(1, 1))
+
+``` 
+(1) hist aapl_data$ganancias, (2) ACF (3) ACF^2
+
+### Conclusiones
+
+- **Leptocurtosis**: La **kurtosis** es mayor que 3, las rentabilidades diarias muestran **colas pesadas** y un **pico alto**, lo que es típico en muchas series financieras.
+- **Agrupación de volatilidad**: La **auto-correlación** en los cuadrados de las rentabilidades confirmaría la **presencia de agrupación de volatilidad**.
+
+### Ajuste de una distribución de probabilidad para capturar la leptocurtosis de las rentabilidades
+
+Ocupamos la distribución t de Student para modelar las rentabilidades diarias de Apple
+
+### Razones principales:
+
+- **Colas más gruesas**:
+  La distribución t de Student tiene colas más gruesas que la distribución normal. Este comportamiento de colas gruesas ayuda a capturar la **leptocurtosis**, que es una característica clave de los datos financieros: **colas pesadas** y un **pico alto** en la distribución.
+
+- **Pico más alto**:
+
+- **Flexibilidad**:
+  La t de Student es más flexible que la distribución normal porque tiene un parámetro adicional, los **grados de libertad**, que controlan el grosor de las colas.
+
+- **Simetría**:
+  A pesar de sus colas gruesas, la t de Student sigue siendo una distribución **simétrica** en torno a la media, lo cual es importante porque las rentabilidades diarias tienden a ser simétricas en su comportamiento general 
+
+- **Uso común en finanzas**:
+  La distribución t de Student es ampliamente utilizada en la modelación de retornos financieros
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+# Cargar las librerías necesarias
+library(fitdistrplus)
+library(MASS)
+
+# Ajuste de una distribución t de Student a las rentabilidades
+fit_t <- fitdistr(aapl_data$ganancias, "t")
+
+# Mostrar los parámetros del ajuste
+cat("Parámetros de la distribución t ajustada:\n")
+cat("Media:", fit_t$estimate[1], "\n")
+cat("Escala:", fit_t$estimate[2], "\n")
+cat("Grados de libertad:", fit_t$estimate[3], "\n")
+```
+
+### Simulación de Rentabilidades usando la Distribución Ajustada
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+# Número de simulaciones
+n_simulaciones <- nrow(aapl_data)
+
+# Generar simulaciones usando la distribución t ajustada
+simulaciones <- rt(n_simulaciones, df = fit_t$estimate[3]) * fit_t$estimate[2] + fit_t$estimate[1]
+
+# Visualizar la distribución simulada
+hist(simulaciones, probability=TRUE, main="Distribución Simulada de las Rentabilidades",
+     xlab="Rentabilidad Simulada", col="lightblue", border="white")
+```
+
+###  Comparación entre la matriz de transición simulada y la versión empírica obtenida en (b).
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+# Clasificar las simulaciones en los mismos tres estados usados anteriormente
+clasificar_simulaciones <- function(dataset){
+  estados_simulados <- cut(dataset, breaks = c(-Inf, -0.01, 0.01, Inf),
+                           labels = c("(-Inf, -0.01]", "(-0.01, 0.01]", "(0.01, Inf]"))
+  return(estados_simulados)
+}
+
+# Clasificar las rentabilidades simuladas
+estados_simulados <- clasificar_simulaciones(simulaciones)
+
+# Calcular la matriz de transición a partir de las simulaciones
+tabla_simulada <- table(estados_simulados[-length(estados_simulados)], estados_simulados[-1])
+
+# Normalizar la tabla para obtener la matriz de transición
+matriz_transicion_simulada <- prop.table(tabla_simulada, 1)
+
+### Comparación de las Matrices de Transición
+
+# Comparar la matriz de transición simulada con la empírica
+cat("Matriz de Transición Empírica:\n")
+print(P_entrenamiento)
+
+cat("\nMatriz de Transición Simulada:\n")
+print(matriz_transicion_simulada)
+
+# Visualización de ambas matrices para comparación
+# Convertir las matrices a dataframes para facilitar la comparación
+df_empirica <- as.data.frame(P_entrenamiento)
+df_simulada <- as.data.frame(matriz_transicion_simulada)
+
+
+```
+
