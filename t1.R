@@ -50,13 +50,13 @@ matriz_transicion = function(dataset){
     for(j in 1:3){
       conteo_punto = 0
       for(k in 1:length(dataset)){
-        if(k+1 == length(dataset)){
-          break
-        }
         par_n0 = dataset[k]
         par_n1 = dataset[k+1]
         if(i == par_n0 & j == par_n1){
           conteo_punto = conteo_punto + 1
+        }
+        if(k+1 == length(dataset)){
+          break
         }
       }
       conteo_fila = conteo_fila + conteo_punto
@@ -85,7 +85,6 @@ formato_matriz = function(matriz, dim){
   return(P)
 }
 
-#set.seed(123456)
 set.seed(2017)
 
 matriz_transicion_entrenamiento = matriz_transicion(ganancias_clasificadas_entrenamiento)
