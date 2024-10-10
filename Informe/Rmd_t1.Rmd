@@ -31,7 +31,7 @@ Para construir la matriz de transición, se siguió el siguiente procedimiento:
    Se contó el número de veces que ocurrió una transición de un estado \(i\) a otro estado \(j\) entre días consecutivos. Las frecuencias de estas transiciones fueron normalizadas para obtener las probabilidades de transición de un estado a otro.
 
 4. **Construcción de la Matriz:** 
-   La matriz de transición \(T\) es una matriz de 3x3 donde la entrada \(T_{ij}\) indica la probabilidad de moverse del estado \(i\) al estado \(j\) en un solo paso. Estas probabilidades se calculan dividiendo el número de transiciones del estado \(i\) al estado \(j\) entre el número total de ocurrencias del estado \(i\).
+   La matriz de transición \(T\) es una matriz de 3x3 donde la entrada \(T_{ij}\) indica la probabilidad de moverse del estado \(i\) al estado \(j\) en un solo paso. Estas probabilidades se calculan dividiendo el número de transiciones del estado \(i\) al estado \(j\) entre la suma total de frecuencias en la fila correspondiente, de esta manera queda normalizado, y si se suman las probabilidades de la fila, es igual a 1, lo cual es una propiedad clave en las cadenas de markov.
    
 La siguiente es la matriz de transición empírica calculada obtenida a partir del conjunto de entrenamiento:
 
@@ -137,7 +137,7 @@ print(P_entrenamiento)
 ## Interpretación
 - La probabilidad de que un día con un retorno negativo significativo (**estado 1**)  sea seguido por otro día con retorno negativo significativo es del 29.09%.
 - Un día con una variación leve (**estado 2**) en el retorno tiene una probabilidad del 54.21% de ser seguido por otro día similar, y una probabilidad del 27.22% de cambiar a un retorno positivo significativo.
-- Los días con retornos positivos significativos (**estado 3**) tienen una alta probabilidad 23.58% de continuar en una tendencia positiva.
+- Los días con retornos positivos significativos (**estado 3**) tienen una probabilidad 23.58% de continuar en una tendencia positiva.
 
 Este análisis nos da una idea clara de cómo los rendimientos diarios de Apple tienden a agruparse o cambiar entre estos estados.
 
@@ -220,7 +220,7 @@ par(mfrow = c(1, 1))
 
 ### Conclusiones
 
-- **Leptocurtosis**: La **kurtosis** es mayor que 3, las rentabilidades diarias muestran **colas pesadas** y un **pico alto**, lo que es típico en muchas series financieras.
+- **Leptocurtosis**: La **kurtosis** nos dio 5.3, lo cual es mayor que 3, las rentabilidades diarias muestran **colas pesadas** y un **pico alto**, lo que es típico en muchas series financieras.
 - **Agrupación de volatilidad**: La **auto-correlación** en los cuadrados de las rentabilidades confirmaría la **presencia de agrupación de volatilidad**.
 
 ### Ajuste de una distribución de probabilidad para capturar la leptocurtosis de las rentabilidades
@@ -287,6 +287,10 @@ print(P_ajustada)
 df_empirica <- as.data.frame(P_entrenamiento)
 df_simulada <- as.data.frame(P_ajustada)
 
+diferencias = c(0.10015765, -0.04666316, -0.053494482, -0.04428668, 0.04828114, -0.003994462, -0.01185293, 0.02123851, -0.009385583)
+desviacion_estandar_diferencias = sd(diferencias)
+
 
 ```
 
+Para comparar ambas matrices, lo que hicimos fue calcular la desviación estándar de las diferencias entre ambas matrices, lo cual nos dio 0.05. En nuestra opinión, es una desviación aceptable teniendo en cuenta que se utilizaría más como una guía para entender que está ocurriendo con las ganancias de Apple, y no utilizarlo creyendo que es una herramienta que puede predecir casi perfectamente lo que está ocurriendo.

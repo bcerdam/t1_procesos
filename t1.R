@@ -2,7 +2,7 @@
 
 library(quantmod)
 # Descargar datos de Apple (AAPL) desde Yahoo Finance
-getSymbols("AAPL", src = "yahoo", from = "2021-08-01", to = "2024-09-30")
+getSymbols("AAPL", src = "yahoo", from = "2021-08-01", to = "2024-09-30", auto.assign=FALSE)
 aapl_data <- AAPL
 head(aapl_data)
 
