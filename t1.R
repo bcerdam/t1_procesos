@@ -1,4 +1,4 @@
-# Parte 1.
+# Parte 1, lectura de datos. (Codigo Profe)
 
 library(quantmod)
 # Descargar datos de Apple (AAPL) desde Yahoo Finance
@@ -6,21 +6,23 @@ getSymbols("AAPL", src = "yahoo", from = "2021-08-01", to = "2024-09-30")
 aapl_data <- AAPL
 head(aapl_data)
 
-# Parte 2. dice "precio de cierre ajustado". Esta variable no existe, solamente existe de cierre o ajustado.
+# Parte 2, Calculo de ganancias. Enunciado dice utilizar "precio de cierre ajustado", pero
+# esta variable no existe, solamente existe de cierre o ajustado, pero no ambas al mismo tiempo. 
 # Voy a ocupar el valor ajustado.
 
 aapl_adjusted = aapl_data$AAPL.Adjusted
 ganancias = dailyReturn(aapl_adjusted)
 aapl_data$ganancias = ganancias
 
-# Parte 3. 
+# Parte 3. Division entrenamiento y prueba.
 
 entrenamiento = aapl_data["2021-08-02/2024-08-31"]
 prueba = aapl_data["2024-09-01/2024-09-27"]
 
 
-# Parte (a)
+# Parte (a), clasificar ganancias en estados.
 
+# clasificar(): Recibe un xts, itera las ganancias y las va clasificando, devuelve un vector con ganancias clasificadas.
 clasificar = function(dataset){
   ganancias_clasificadas = c()
   for(i in 1:nrow(dataset)){
@@ -40,8 +42,11 @@ clasificar = function(dataset){
 ganancias_clasificadas_entrenamiento = clasificar(entrenamiento)
 ganancias_clasificadas_prueba = clasificar(prueba)
 
-# Parte (b)
+# Parte (b), obtener matriz transicion de datos entrenamiento.
 
+# matriz_transicion(): Recibe vector, no dataset. Itera todas las combinaciones posibles de estados ((1, 2, 3)x(1, 2, 3))
+# y va contando cuantas veces se repite en los datos, luego, divide por fila para que sea una probabilidad y retorna 
+# los valores de la matriz de transicion.
 matriz_transicion = function(dataset){
   frecuencias_totales = c()
   for(i in 1:3){
@@ -67,6 +72,9 @@ matriz_transicion = function(dataset){
   return (frecuencias_totales)
 }
 
+
+# formato_matriz(): Recibe las frecuencias de los estados que vienen de matriz_transicion(), y un parametro dim para
+# especificar la dimension de la matriz de transicion, devuelve la matriz de transicion en un formato leible.
 formato_matriz = function(matriz, dim){
   P = matrix(nrow=dim, ncol=dim)
   contador = 0
@@ -80,8 +88,8 @@ formato_matriz = function(matriz, dim){
       contador = 0
     }
   }
-  colnames(P) <- c(1:dim)
-  rownames(P) <- c(1:dim)
+  colnames(P) <- c(1:dim) # Codigo del profe
+  rownames(P) <- c(1:dim) # Codigo del profe
   return(P)
 }
 
@@ -92,7 +100,11 @@ matriz_transicion_prueba = matriz_transicion(ganancias_clasificadas_prueba)
 P_entrenamiento = formato_matriz(matriz_transicion_entrenamiento, 3)
 P_prueba = formato_matriz(matriz_transicion_prueba, 3)
 
-# Parte (c)
+# Descomentar para observar resultado de matrices
+# P_entrenamiento
+# P_prueba
+
+# Parte (c), Generamos vectores de estados para dias de septiembre. (En su mayoria, codigo del profresor)
 
 pi.0 = c(0, 1, 0)
 D <- diag(eigen(P_entrenamiento)$value)
@@ -105,7 +117,9 @@ for(k in 1:nrow(prueba)){
 }
 rownames(Pn) <- 1:nrow(prueba)
 colnames(Pn) <- 1:3
-Pn
+
+# Descomentar para observar vectores de estados para dias de septiembre.
+# Pn
 
 # simulacion
 vector_promedios = c()
@@ -118,9 +132,10 @@ for(i in 1:1000){
   vector_promedios = append(vector_promedios, promedio)
 }
 
-hist(vector_promedios)
+# Descomentar para observar histograma de promedio de resultados.
+# hist(vector_promedios)
 
-# parte (d)
+# parte (d), verificar si tiene comportamiento leptocurtico, auto correlacion.
 
 # comportamiento leptocurtico => verificar si kurtosis es positiva
 # Tambien visualmente podemos ver si tiene colas pesadas y una concentracion central mas grande.
@@ -129,14 +144,10 @@ hist(vector_promedios)
 library(moments)
 ganancias_kurtosis = kurtosis(aapl_data$ganancias) # Positiva y no se aproxima a 0 -> comportamiento leptocurtico.
 
-hist(aapl_data$ganancias) # Concentracion central si, "pico alto" si, colas pesadas si.
+# Descomentar para observar.Tiene alta concentracion central, "pico alto", colas pesadas si.
+# hist(aapl_data$ganancias) 
 
-# Yo diria que si tiene comportamiento leptocurtico.
-
-# No se a que se refiere con: 'baja o nula auto-correlación serial y auto-correlación serial significativa en sus cuadrados.'
-
-
-# parte (e)
+# parte (e), ajustar distribucion, por EMV, que tenga caracterisitcas leptocurticas, y simular matriz transicion a partir de esta.
 
 # install.packages("fitdistrplus")
 library(fitdistrplus)
@@ -159,12 +170,16 @@ samples = m + s * rt(nrow(aapl_data$ganancias), df)
 library(xts)
 fechas = seq(as.Date("2022-08-01"), by = "day", length.out = nrow(aapl_data$ganancias))
 valores_simulados = xts(samples, fechas)
-colnames(valores_simulados) <- 'ganancias'
+colnames(valores_simulados) = 'ganancias'
 
 P_ajustada = formato_matriz(matriz_transicion(clasificar(valores_simulados)), 3)
 
-# Comparacion matriz transicion ajustada y entrenamiento.
+# Descomentar para Comparacion matriz transicion ajustada y entrenamiento.
 P_entrenamiento
 P_ajustada
+
+# Yo diria que la diferencia no es tanta. Lo que hice fue restar ambas matrices y calcular desviacion estandar de las diferencias.
+diferencias = c(0.10015765, -0.04666316, -0.053494482, -0.04428668, 0.04828114, -0.003994462, -0.01185293, 0.02123851, -0.009385583)
+desviacion_estandar_diferencias = sd(diferencias)
 
 
